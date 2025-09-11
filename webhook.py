@@ -27,8 +27,9 @@ async def github_webhook(
             message = f"PR closed: <a href='{url}'>#{pr_number} {title}</a>"
     elif x_github_event == "ping":
         repository = data.get("repository", {})
-        repository_full_name = repository.get("full_name")
-        message = f"Successfully installed in {repository_full_name}"
+        name = repository.get("full_name")
+        url = repository.get("html_url")
+        message = f"Successfully installed in <a href='{url}'>{name}</a>"
 
     await bot.send_message(chat_id=chat_id, text=message, parse_mode="HTML")
 
