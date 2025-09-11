@@ -3,7 +3,7 @@ from telebot import bot
 
 app = FastAPI()
 
-@app.post("/webhook")
+@app.post("/")
 async def github_webhook(
     request: Request,
     chat_id: str,
