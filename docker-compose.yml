@@ -1,0 +1,13 @@
+services:
+  telebot:
+    build: .
+    command: uv run telebot.py
+    restart: unless-stopped
+    env_file: .env
+  webhook:
+    build: .
+    command: uv run fastapi run webhook.py
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "8001:8000"
