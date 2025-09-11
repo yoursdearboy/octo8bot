@@ -30,6 +30,8 @@ async def github_webhook(
         name = repository.get("full_name")
         url = repository.get("html_url")
         message = f"Successfully installed in <a href='{url}'>{name}</a>"
+    else:
+        return {"status": "ok"}
 
     await bot.send_message(chat_id=chat_id, text=message, parse_mode="HTML")
 
