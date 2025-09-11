@@ -25,6 +25,8 @@ async def github_webhook(
             message = f"PR updated: <a href='{url}'>#{pr_number} {title}</a>"
         elif action == "closed":
             message = f"PR closed: <a href='{url}'>#{pr_number} {title}</a>"
+        else:
+            return {"status": "ok"}
     elif x_github_event == "ping":
         repository = data.get("repository", {})
         name = repository.get("full_name")
