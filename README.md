@@ -1,4 +1,4 @@
-# octo8bot
+# Octobot
 
 octo8bot sends GitHub pull request and branch push notifications to Telegram chats. The entire application runs as one Cloudflare Worker: Telegram calls `/telegram` when the bot joins a chat, and GitHub calls the chat-specific `/github` URL returned by the bot.
 
