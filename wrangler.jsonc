@@ -1,0 +1,12 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "octo8bot",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-27",
+  "secrets": {
+    "required": ["TELEGRAM_TOKEN", "TELEGRAM_WEBHOOK_SECRET"]
+  },
+  "observability": {
+    "enabled": true
+  }
+}

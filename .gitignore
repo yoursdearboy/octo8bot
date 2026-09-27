@@ -1,13 +1,9 @@
-# Python-generated files
-__pycache__/
-*.py[oc]
-build/
+# Dependencies and build output
+node_modules/
 dist/
-wheels/
-*.egg-info
+.wrangler/
 
-# Virtual environments
-.venv
-
-# Environment variables
-.env
+# Local secrets
+.dev.vars*
+!.dev.vars.example
+.env*
