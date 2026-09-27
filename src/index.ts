@@ -121,7 +121,7 @@ async function handleTelegramWebhook(
   githubWebhookUrl.searchParams.set("chat_id", String(chatId));
 
   const message = [
-    "Hello!",
+    "👋 Hello!",
     "",
     `Your GitHub webhook URL is: <code>${escapeHtml(githubWebhookUrl.toString())}</code>`,
     "",
@@ -170,7 +170,7 @@ function formatGitHubMessage(event: string | null, payload: JsonObject): string 
   if (event === "ping") {
     const repository = asObject(payload.repository);
     const name = shortText(repository.full_name, 160, "unknown repository");
-    return `Successfully installed in ${htmlLink(repository.html_url, name)}`;
+    return `✅ Successfully installed in ${htmlLink(repository.html_url, name)}`;
   }
 
   if (event === "pull_request") {
@@ -199,12 +199,12 @@ function formatPullRequest(payload: JsonObject): string | null {
   const linkedPullRequest = htmlLink(pullRequest.html_url, label);
 
   if (action === "opened") {
-    return `PR created: ${linkedPullRequest} by ${escapeHtml(author)}`;
+    return `🎉 PR created: ${linkedPullRequest} by ${escapeHtml(author)}`;
   }
   if (action === "synchronize") {
-    return `PR updated: ${linkedPullRequest}`;
+    return `🧩 PR updated: ${linkedPullRequest}`;
   }
-  return `PR closed: ${linkedPullRequest}`;
+  return `🏁 PR closed: ${linkedPullRequest}`;
 }
 
 function formatPush(payload: JsonObject): string | null {
@@ -234,7 +234,7 @@ function formatPush(payload: JsonObject): string | null {
   const repositoryLink = htmlLink(repository.html_url, repositoryName);
   const compareLink = htmlLink(payload.compare, `${commitCount} ${commitWord}`);
   const lines = [
-    `Push to ${repositoryLink} on <code>${escapeHtml(branch)}</code> by ${escapeHtml(pushedBy)}: ${compareLink}`,
+    `🚀 Push to ${repositoryLink} on <code>${escapeHtml(branch)}</code> by ${escapeHtml(pushedBy)}: ${compareLink}`,
   ];
 
   let included = 0;
