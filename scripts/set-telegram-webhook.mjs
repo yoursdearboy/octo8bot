@@ -42,7 +42,7 @@ const response = await fetch(
     body: JSON.stringify({
       url: webhookUrl.toString(),
       secret_token: secret,
-      allowed_updates: ["my_chat_member"],
+      allowed_updates: ["message", "my_chat_member"],
     }),
   },
 );

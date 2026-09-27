@@ -11,6 +11,10 @@ interface Env {
 }
 
 interface TelegramUpdate {
+  message?: {
+    text?: string;
+    chat?: { id?: number | string };
+  };
   my_chat_member?: {
     chat?: { id?: number | string };
     new_chat_member?: { status?: string };
@@ -27,6 +31,8 @@ interface WebhookRequest extends IRequest {
 const TELEGRAM_MESSAGE_LIMIT = 4096;
 const MESSAGE_BUILD_LIMIT = 3800;
 const MAX_PUSH_COMMITS = 10;
+const START_MESSAGE =
+  "👋 Add me to a group chat to receive GitHub notifications from a repo in it.";
 
 const router = AutoRouter<WebhookRequest, [Env]>({
   missing: (request) =>
@@ -83,6 +89,24 @@ async function handleTelegramWebhook(
   env: Env,
 ): Promise<JsonObject | Response> {
   const update = request.content as TelegramUpdate;
+  const incomingMessage = update.message;
+  if (
+    incomingMessage?.chat?.id !== undefined &&
+    isStartCommand(incomingMessage.text)
+  ) {
+    try {
+      await sendTelegramMessage(
+        env.TELEGRAM_TOKEN,
+        String(incomingMessage.chat.id),
+        START_MESSAGE,
+      );
+    } catch (error) {
+      return upstreamError(error);
+    }
+
+    return { status: "ok" };
+  }
+
   const membership = update.my_chat_member;
   const status = membership?.new_chat_member?.status;
   const chatId = membership?.chat?.id;
@@ -114,6 +138,13 @@ async function handleTelegramWebhook(
   }
 
   return { status: "ok" };
+}
+
+function isStartCommand(text: unknown): boolean {
+  return (
+    typeof text === "string" &&
+    /^\/start(?:@[A-Za-z0-9_]+)?(?:\s|$)/.test(text)
+  );
 }
 
 async function handleGitHubWebhook(
