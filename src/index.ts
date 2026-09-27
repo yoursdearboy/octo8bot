@@ -1,3 +1,10 @@
+import {
+  AutoRouter,
+  error,
+  withContent,
+  type IRequest,
+} from "itty-router";
+
 interface Env {
   TELEGRAM_TOKEN: string;
   TELEGRAM_WEBHOOK_SECRET: string;
@@ -12,61 +19,81 @@ interface TelegramUpdate {
 
 type JsonObject = Record<string, unknown>;
 
+interface WebhookRequest extends IRequest {
+  chatId?: string;
+  content?: JsonObject;
+}
+
 const TELEGRAM_MESSAGE_LIMIT = 4096;
 const MESSAGE_BUILD_LIMIT = 3800;
 const MAX_PUSH_COMMITS = 10;
 
-export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
-    const url = new URL(request.url);
+const router = AutoRouter<WebhookRequest, [Env]>({
+  missing: (request) =>
+    request.method === "POST"
+      ? new Response("Not Found", { status: 404 })
+      : new Response("Method Not Allowed", {
+          status: 405,
+          headers: { Allow: "POST" },
+        }),
+});
 
-    if (request.method !== "POST") {
-      return new Response("Method Not Allowed", {
-        status: 405,
-        headers: { Allow: "POST" },
-      });
-    }
+router.post(
+  "/telegram",
+  authenticateTelegram,
+  withJsonObject,
+  handleTelegramWebhook,
+);
+router.post("/github", requireChatId, withJsonObject, handleGitHubWebhook);
 
-    if (url.pathname === "/telegram") {
-      return handleTelegramWebhook(request, url, env);
-    }
+export default { ...router };
 
-    if (url.pathname === "/github") {
-      return handleGitHubWebhook(request, url, env);
-    }
-
-    return new Response("Not Found", { status: 404 });
-  },
-};
-
-async function handleTelegramWebhook(
-  request: Request,
-  url: URL,
-  env: Env,
-): Promise<Response> {
+function authenticateTelegram(request: WebhookRequest, env: Env) {
   const suppliedSecret = request.headers.get(
     "X-Telegram-Bot-Api-Secret-Token",
   );
   if (!suppliedSecret || suppliedSecret !== env.TELEGRAM_WEBHOOK_SECRET) {
-    return jsonResponse({ status: "error", error: "unauthorized" }, 401);
+    return error(401, { status: "error", error: "unauthorized" });
   }
+}
 
-  const update = await readJson<TelegramUpdate>(request);
-  if (!update.ok) {
-    return update.response;
+async function withJsonObject(request: WebhookRequest, _env: Env) {
+  await withContent(request);
+  if (!isJsonObject(request.content)) {
+    return error(400, { status: "error", error: "invalid JSON" });
   }
+}
 
-  const membership = update.value.my_chat_member;
+function requireChatId(request: WebhookRequest, _env: Env) {
+  const chatIdValue = request.query.chat_id;
+  const chatId = (
+    Array.isArray(chatIdValue) ? chatIdValue[0] : chatIdValue
+  )?.trim();
+  if (!chatId) {
+    return error(400, {
+      status: "error",
+      error: "chat_id is required",
+    });
+  }
+  request.chatId = chatId;
+}
+
+async function handleTelegramWebhook(
+  request: WebhookRequest,
+  env: Env,
+): Promise<JsonObject | Response> {
+  const update = request.content as TelegramUpdate;
+  const membership = update.my_chat_member;
   const status = membership?.new_chat_member?.status;
   const chatId = membership?.chat?.id;
   if (
     chatId === undefined ||
     (status !== "member" && status !== "administrator")
   ) {
-    return jsonResponse({ status: "ok" });
+    return { status: "ok" };
   }
 
-  const githubWebhookUrl = new URL("/github", url.origin);
+  const githubWebhookUrl = new URL("/github", request.url);
   githubWebhookUrl.searchParams.set("chat_id", String(chatId));
 
   const message = [
@@ -86,37 +113,26 @@ async function handleTelegramWebhook(
     return upstreamError(error);
   }
 
-  return jsonResponse({ status: "ok" });
+  return { status: "ok" };
 }
 
 async function handleGitHubWebhook(
-  request: Request,
-  url: URL,
+  request: WebhookRequest,
   env: Env,
-): Promise<Response> {
-  const chatId = url.searchParams.get("chat_id")?.trim();
-  if (!chatId) {
-    return jsonResponse({ status: "error", error: "chat_id is required" }, 400);
-  }
-
-  const payload = await readJson<JsonObject>(request);
-  if (!payload.ok) {
-    return payload.response;
-  }
-
+): Promise<JsonObject | Response> {
   const event = request.headers.get("X-GitHub-Event");
-  const message = formatGitHubMessage(event, payload.value);
+  const message = formatGitHubMessage(event, request.content!);
   if (!message) {
-    return jsonResponse({ status: "ok" });
+    return { status: "ok" };
   }
 
   try {
-    await sendTelegramMessage(env.TELEGRAM_TOKEN, chatId, message);
+    await sendTelegramMessage(env.TELEGRAM_TOKEN, request.chatId!, message);
   } catch (error) {
     return upstreamError(error);
   }
 
-  return jsonResponse({ status: "ok" });
+  return { status: "ok" };
 }
 
 function formatGitHubMessage(event: string | null, payload: JsonObject): string | null {
@@ -246,23 +262,12 @@ async function sendTelegramMessage(
   }
 }
 
-async function readJson<T>(
-  request: Request,
-): Promise<{ ok: true; value: T } | { ok: false; response: Response }> {
-  try {
-    return { ok: true, value: (await request.json()) as T };
-  } catch {
-    return {
-      ok: false,
-      response: jsonResponse({ status: "error", error: "invalid JSON" }, 400),
-    };
-  }
+function asObject(value: unknown): JsonObject {
+  return isJsonObject(value) ? value : {};
 }
 
-function asObject(value: unknown): JsonObject {
-  return value !== null && typeof value === "object" && !Array.isArray(value)
-    ? (value as JsonObject)
-    : {};
+function isJsonObject(value: unknown): value is JsonObject {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
 function stringValue(value: unknown): string | undefined {
@@ -324,14 +329,10 @@ function escapeHtml(value: string): string {
     .replaceAll('"', "&quot;");
 }
 
-function upstreamError(error: unknown): Response {
-  console.error(error);
-  return jsonResponse(
-    { status: "error", error: "Telegram API request failed" },
+function upstreamError(cause: unknown): Response {
+  console.error(cause);
+  return error(
     502,
+    { status: "error", error: "Telegram API request failed" },
   );
-}
-
-function jsonResponse(body: JsonObject, status = 200): Response {
-  return Response.json(body, { status });
 }
