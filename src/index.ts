@@ -13,7 +13,10 @@ interface Env {
 interface TelegramUpdate {
   message?: {
     text?: string;
-    chat?: { id?: number | string };
+    chat?: {
+      id?: number | string;
+      type?: "private" | "group" | "supergroup" | "channel";
+    };
   };
   my_chat_member?: {
     chat?: { id?: number | string };
@@ -94,12 +97,13 @@ async function handleTelegramWebhook(
     incomingMessage?.chat?.id !== undefined &&
     isStartCommand(incomingMessage.text)
   ) {
+    const chatId = String(incomingMessage.chat.id);
+    const message =
+      incomingMessage.chat.type === "private"
+        ? START_MESSAGE
+        : buildSetupMessage(request.url, chatId);
     try {
-      await sendTelegramMessage(
-        env.TELEGRAM_TOKEN,
-        String(incomingMessage.chat.id),
-        START_MESSAGE,
-      );
+      await sendTelegramMessage(env.TELEGRAM_TOKEN, chatId, message);
     } catch (error) {
       return upstreamError(error);
     }
@@ -117,10 +121,22 @@ async function handleTelegramWebhook(
     return { status: "ok" };
   }
 
-  const githubWebhookUrl = new URL("/github", request.url);
-  githubWebhookUrl.searchParams.set("chat_id", String(chatId));
+  const message = buildSetupMessage(request.url, String(chatId));
 
-  const message = [
+  try {
+    await sendTelegramMessage(env.TELEGRAM_TOKEN, String(chatId), message);
+  } catch (error) {
+    return upstreamError(error);
+  }
+
+  return { status: "ok" };
+}
+
+function buildSetupMessage(requestUrl: string, chatId: string): string {
+  const githubWebhookUrl = new URL("/github", requestUrl);
+  githubWebhookUrl.searchParams.set("chat_id", chatId);
+
+  return [
     "👋 Hello!",
     "",
     `Your GitHub webhook URL is: <code>${escapeHtml(githubWebhookUrl.toString())}</code>`,
@@ -130,14 +146,6 @@ async function handleTelegramWebhook(
     "",
     "The bot will notify this chat about pull requests and regular branch pushes.",
   ].join("\n");
-
-  try {
-    await sendTelegramMessage(env.TELEGRAM_TOKEN, String(chatId), message);
-  } catch (error) {
-    return upstreamError(error);
-  }
-
-  return { status: "ok" };
 }
 
 function isStartCommand(text: unknown): boolean {

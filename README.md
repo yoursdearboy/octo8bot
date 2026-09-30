@@ -46,7 +46,7 @@ TELEGRAM_WEBHOOK_SECRET='your-random-secret' \
 npm run telegram:set-webhook -- https://octo8bot.example.workers.dev
 ```
 
-The setup command configures Telegram to deliver message and `my_chat_member` updates to `/telegram` and authenticates them with the secret header. Send the bot `/start` to see its introduction.
+The setup command configures Telegram to deliver message and `my_chat_member` updates to `/telegram` and authenticates them with the secret header. Send `/start` in a group to receive that chat's GitHub webhook URL again; sending it directly to the bot shows the introduction.
 
 ## Connect a Telegram chat to GitHub
 
